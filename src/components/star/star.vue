@@ -1,6 +1,6 @@
 <template>
   <div class="star" :class="starType">
-    <span  v-for="itemClass in itemClasses"  :class="itemClass" class="star-item" track-by="$index"></span>
+    <span  v-for="(itemClass, index) in itemClasses"  :key="index" :class="itemClass" class="star-item"></span>
   </div>
 </template>
 
@@ -11,7 +11,7 @@
     const CLS_OFF = 'off';
     export default {
         name: 'star',
-      prop: {
+      props: {
           size: {
             type: Number
           },
