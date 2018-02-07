@@ -32,10 +32,8 @@
       // 使用=>函数没事，用function（response）{ }就会报错。。。。
       this.$http.get('/api/seller').then((response) => {
         response = response.data;
-        console.log(response);
         if (response.errno === ERR_OK) {
           this.seller = response.data;
-          console.log(this.seller);
         }
       });
     }
