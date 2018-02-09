@@ -1,20 +1,22 @@
 <template>
   <div class="goods">
-    <div class="menu-wrapper">
+    <div class="menu-wrapper" ref="menuwrapper">
       <ul>
-        <li v-for="(item, index) in goods" :key="index" class="menu-item">
+        <li v-for="(item, index) in goods" :key="index" class="menu-item" :class="{'current':currentIndex===index}" @click="selectMenu(index)">
           <span class="text border-1px">
             <span v-show="item.type>0" class="icon" :class="classMap[item.type]"></span>{{item.name}}
           </span>
         </li>
       </ul>
     </div>
-    <div class="foods-wrapper">
+    <div class="foods-wrapper" ref="foodwrapper">
+      <!--这里和上面的ref="foodwrapper"本来想写成ref="food-wrapper"-->
+      <!--然后下面的better-scroll中写成foodWrapper的，但是报错，所以改成这样了-->
       <ul>
-        <li v-for="(item,index) in goods" class="food-list" :key="index">
+        <li class="food-list food-list-hook" v-for="(item,index) in goods" :key="index">
           <h1 class="title">{{item.name}}</h1>
           <ul>
-            <li v-for="(food,index) in item.foods" class="food-item" :key="index" border-1px>
+            <li class="food-item" v-for="(food,index) in item.foods" :key="index" border-1px>
               <div class="icon">
                 <img width="57" height="57" :src="food.icon">
               </div>
@@ -26,8 +28,11 @@
                   <span>好评率{{food.rating}}%</span>
                 </div>
                 <div class="price">
-                  <span class="now">￥{{food.price}}</span>
-                  <span class="old" v-show="food.oldPrice">￥{{food.oldPrice}}</span>
+                  <!--两个span不分行的原因是分行后页面效果有间隙-->
+                  <span class="now">￥{{food.price}}</span><span class="old" v-show="food.oldPrice">￥{{food.oldPrice}}</span>
+                </div>
+                <div class="cartcontrol-wrapper">
+                  <cartcontrol :food="food"></cartcontrol>
                 </div>
               </div>
             </li>
@@ -35,32 +40,103 @@
         </li>
       </ul>
     </div>
+    <shopcart :select-foods="selectFoods" :delivery-price="seller.deliveryPrice" :min-price="seller.minPrice"></shopcart>
   </div>
 </template>
 
 <script type="text/ecmascript-6">
+  import BScroll from 'better-scroll';
+  import shopcart from '../shopcart/shopcart';
+  import cartcontrol from '../cartcontrol/cartcontrol';
   const ERR_OK = 0;
   export default {
       name: 'goods',
       props: {
-        seller: {
+        seller: {// 父组件的商家信息
           type: Object
         }
       },
       data: function () {
         return {
-          goods: {}
+          goods: [], // 存放商品信息
+          listHeight: [], // 存放商品列表中每一类商品在页面中的行高
+          scrollY: 0
         };
       },
+      computed: {
+        currentIndex() {
+          for (let i = 0; i < this.listHeight.length; i++) {
+            let height1 = this.listHeight[i];
+            let height2 = this.listHeight[i + 1];
+            if (!height2 || (this.scrollY >= height1 && this.scrollY < height2)) {
+              return i;
+            }
+          }
+          return 0;
+        },
+        selectFoods() {
+          let foods = [];
+          this.goods.forEach((good) => {
+            good.foods.forEach((food) => {
+              if (food.count) {
+                foods.push(food);
+              }
+            });
+          });
+          return foods;
+        }
+    },
       created: function() {
         this.classMap = ['decrease', 'discount', 'special', 'invoice', 'guarantee'];
         this.$http.get('api/goods').then((response) => {
           response = response.data;
           if (response.errno === ERR_OK) {
             this.goods = response.data;
-            console.log(this.goods);
+            // console.log(this.goods);
+            this.$nextTick(() => {
+              // 异步数据处理
+              this._initScroll();
+              this._calculateHeight();
+            });
           }
+        });
+      },
+      methods: {
+        _initScroll() {
+          // new了两个滚动类
+          this.meunScroll = new BScroll(this.$refs.menuwrapper, {
+            click: true // 属性含义，激活默认点击事件，因为betterscroll会默认屏蔽各种监控事件，不添加时写点击事件是无响应的
+                        // pc端无影响
           });
+          this.foodsScroll = new BScroll(this.$refs.foodwrapper, {
+            click: true,
+            probeType: 3 // 属性含义：在scroll滚动时，实时监控滚动的位置
+          });
+          this.foodsScroll.on('scroll', (pos) => {
+            this.scrollY = Math.abs(Math.round(pos.y));
+          });
+        },
+        _calculateHeight() {
+          // 计算商品列表每一类的行高，用于判断当前窗口在哪一类商品，目的：左侧商品类栏对应高亮
+          let foodList = this.$refs.foodwrapper.getElementsByClassName('food-list-hook');
+          let height = 0;
+          this.listHeight.push(height);
+          for (let i = 0; i < foodList.length; i++) {
+            let item = foodList[i];
+            height += item.clientHeight;
+            this.listHeight.push(height);
+          }
+        },
+        selectMenu: function (index) {
+          // console.log(index);
+          let foodList = this.$refs.foodwrapper.getElementsByClassName('food-list-hook');
+          let el = foodList[index];
+          this.foodsScroll.scrollToElement(el, 300);
+        }
+      },
+      components: {
+        shopcart,
+        cartcontrol
       }
   };
 </script>
@@ -84,6 +160,14 @@
         height: 54px
         padding: 0 12px
         line-height: 14px
+        &.current
+          position: relative
+          z-index: 10
+          margin-top: -1px
+          background: #fff
+          font-weight: 700
+          .text
+            border-none()
         .icon
           display: inline-block
           vertical-align: top
@@ -137,14 +221,15 @@
             line-height: 14px
             font-size: 14px
             color: rgb(7,17,27)
-          .desc,extra
-            line-height: 10px
+          .desc, .extra
             font-size: 10px
             color: rgb(147,153,159)
           .desc
+            line-height: 12px
             margin-bottom: 8px
           .extra
-            &.count
+            .count
+              line-height: 10px
               margin-right: 12px
           .price
             font-weight: 700
@@ -157,4 +242,8 @@
               text-decoration: line-through
               font-size: 10px
               color: rgb(147,153,159)
+          .cartcontrol-wrapper
+            position: absolute
+            right: 0
+            bottom: 12px
 </style>

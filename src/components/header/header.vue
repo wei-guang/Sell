@@ -157,7 +157,6 @@
           .text
             line-height: 12px
             font-size: 10px
-
       .support-count
         position: absolute
         right: 12px
@@ -214,7 +213,7 @@
       filter: blur(10px)
     .detail
       position:fixed
-      z-index: 100%
+      z-index: 100
       top: 0
       left:0
       width: 100%
